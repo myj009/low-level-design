@@ -45,4 +45,7 @@ int main(){
     auto ps1 = new CreditCard();
     processor.setStrategy(ps1);
     processor.executePayment("mj", "ss", 400);
+
+    delete ps;
+    delete ps1;
 }
