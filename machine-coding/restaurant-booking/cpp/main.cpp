@@ -120,7 +120,9 @@ public:
         int id = bookable->GetID();
         if(mp.find(id) != mp.end()) cout<<"Already Registered\n";
 
-        restaurants.push_front(dynamic_cast<Restaurant*>(bookable));
+        auto res = dynamic_cast<Restaurant*>(bookable);
+        if(res == nullptr) cout<<"Invalid restaurant.\n";
+        restaurants.push_front(res);
         mp[bookable->GetID()] = restaurants.begin();
     }
 
@@ -155,20 +157,20 @@ public:
 };
 
 class System {
-    System(BookingMgr* mgr): bookingMgr(mgr) {};
+    System(BookingMgr& mgr): bookingMgr(mgr) {};
     ~System() = default;
 
-    BookingMgr* bookingMgr;
+    BookingMgr& bookingMgr;
 public:
     System(const System&) = delete;
     System operator=(const System&) = delete;
 
-    static System& getInstance(BookingMgr* mgr) {
+    static System& getInstance(BookingMgr& mgr) {
         static System instance(mgr);
         return instance;
     }
 
-    void SetBookingMgr(BookingMgr* mgr) {
+    void SetBookingMgr(BookingMgr& mgr) {
         bookingMgr = mgr;
     }
 };
@@ -184,6 +186,6 @@ int main() {
     resMgr.Unregister(mcd->GetID());
     resMgr.ListBookables();
 
-    // mcd->print();
-    // br->print();
+    System& system = System::getInstance(resMgr);
+
 }
