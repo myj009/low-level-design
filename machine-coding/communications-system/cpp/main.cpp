@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <unordered_set>
 #include <vector>
+#include <functional>
 using namespace std;
 
 enum CommsType {
@@ -35,7 +36,8 @@ struct CommsRequest {
     CommsPriority priority;
     unordered_map<string, string> payload;
     BasicAuth* auth;
-    CommsRequest(CommsType type, CommsPriority p, unordered_map<string, string>& payload): requestType(type), priority(p), payload(payload), auth(nullptr) {}
+    int msgID;
+    CommsRequest(CommsType type, CommsPriority p, unordered_map<string, string>& payload): requestType(type), priority(p), payload(payload), auth(nullptr), msgID(-1) {}
 };
 
 struct CommsProvider;
@@ -106,15 +108,15 @@ public:
         return supportedRequestTypes.find(requestType) != supportedRequestTypes.end();
     }
 
-    virtual void processSMS(const CommsRequest* request) {
+    virtual void processSMS(const CommsRequest* request, function<void(int, bool)>& callback) {
         throw logic_error("SMS is not supported in this provider");
     }
 
-    virtual void processEmail(const CommsRequest* request) {
+    virtual void processEmail(const CommsRequest* request, function<void(int, bool)>& callback) {
         throw logic_error("Email is not supported in this provider");
     }
 
-    virtual void processSoundbox(const CommsRequest* request) {
+    virtual void processSoundbox(const CommsRequest* request, function<void(int, bool)>& callback) {
         throw logic_error("Soundbox is not supported in this provider");
     }
 
@@ -123,33 +125,20 @@ public:
     virtual ~Provider() = default;
 };
 
-// class SMSHandler {
-// public:
-//     virtual void processSMS(const CommsRequest* request) = 0;
-// };
-
-// class EmailHandler {
-// public:
-//     virtual void processEmail(const CommsRequest* request) = 0;
-// };
-
-// class SoundboxHandler {
-// public:
-//     virtual void processSoundbox(const CommsRequest* request) = 0;
-// };
-
 class TwilioProvider: public Provider {
 public:
     TwilioProvider(string id, string name, vector<CommsType>& supportedRequests): Provider(id, name, supportedRequests) {}
 
-    virtual void processEmail(const CommsRequest* request) override {
+    virtual void processEmail(const CommsRequest* request, function<void(int, bool)>& callback) override {
         if(!authenticate(request->auth)) return;
         cout<<"Sending Email"<<"\n";
+        callback(request->msgID, true);
     }
 
-    virtual void processSMS(const CommsRequest* request) override {
+    virtual void processSMS(const CommsRequest* request, function<void(int, bool)>& callback) override {
         if(!authenticate(request->auth)) return;
         cout<<"Sending SMS"<<"\n";
+        callback(request->msgID, true);
     }
 
     virtual double getSuccessPercent() {
@@ -161,14 +150,16 @@ class AWSProvider: public Provider {
 public:
     AWSProvider(string id, string name, vector<CommsType>& supportedRequests): Provider(id, name, supportedRequests) {}
 
-    virtual void processEmail(const CommsRequest* request) override {
+    virtual void processEmail(const CommsRequest* request, function<void(int, bool)>& callback) override {
         if(!authenticate(request->auth)) return;
         cout<<"Sending Email"<<"\n";
+        callback(request->msgID, true);
     }
 
-    virtual void processSoundbox(const CommsRequest* request) override {
+    virtual void processSoundbox(const CommsRequest* request, function<void(int, bool)>& callback) override {
         if(!authenticate(request->auth)) return;
         cout<<"Sending Soundbox"<<"\n";
+        callback(request->msgID, true);
     }
 
     virtual double getSuccessPercent() {
@@ -255,6 +246,11 @@ public:
 
     }
 
+    // void providerWebhook(int msgId, bool isSuccess) {
+    //     if(comms.find(msgId) == comms.end()) cout<<"Message not found";
+    //     comms[msgId]->setStatus(isSuccess ? CommsStatus::SUCCESSFUL : CommsStatus::FAILED);
+    // }
+
     void setRoutingStrategy(RoutingStrategy* rs) {
         routingStrategy = rs;
     }
@@ -292,18 +288,37 @@ public:
         //     cout<<pid<<" ";
         // }
         // cout<<"\n";
+        // std::shared_ptr<CommsSystem> self = shared_from_this();
+        function<void(int, bool)> callbackFn = [this](int msgId, bool isSuccess) {
+            
+            auto newComms = this->comms;
+            // cout<<newComms.size();
+            
+            if(newComms.find(msgId) == newComms.end()){ 
+                cout<<"Message not found";
+                return;
+            }
+            
+            newComms[msgId]->setStatus(isSuccess ? CommsStatus::SUCCESSFUL : CommsStatus::FAILED);
+            // cout<<"here\n"<<&newComms<<"\n";
+            cout<<"Recieved callback\n";
+        };
+
         auto p = routingStrategy->getProviderForRequestType(providers, request->requestType);
         auto provider = providers[p->getID()];
         request->auth = provider->auth;
+        CommsMessages* comm = new CommsMessages(request, provider->instance->getID(), CommsStatus::PROCESSING);
+        comms[comm->id] = comm;
+        request->msgID = comm->id;
+
         if(request->requestType == CommsType::EMAIL) {
-            provider->instance->processEmail(request);
+            provider->instance->processEmail(request, callbackFn);
         } else if(request->requestType == CommsType::SMS) {
-            provider->instance->processSMS(request);
+            provider->instance->processSMS(request, callbackFn);
         } else {
-            provider->instance->processSoundbox(request);
+            provider->instance->processSoundbox(request, callbackFn);
         }
 
-        CommsMessages* comms = new CommsMessages(request, provider->instance->getID(), CommsStatus::PROCESSING);
     }
 };
 
