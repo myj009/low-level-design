@@ -324,29 +324,29 @@ public:
 
 int main() {
     try{
-    CommsSystem& system = CommsSystem::getInstance();
+        CommsSystem& system = CommsSystem::getInstance();
 
-    vector<CommsType> twilioTypes = {CommsType::EMAIL, CommsType::SMS};
-    auto twilio = new TwilioProvider("twilio", "twilio", twilioTypes);
+        vector<CommsType> twilioTypes = {CommsType::EMAIL, CommsType::SMS};
+        auto twilio = new TwilioProvider("twilio", "twilio", twilioTypes);
 
-    vector<CommsType> awsTypes = {CommsType::EMAIL, CommsType::SOUNDBOX};
-    auto aws = new AWSProvider("aws", "aws", awsTypes);
+        vector<CommsType> awsTypes = {CommsType::EMAIL, CommsType::SOUNDBOX};
+        auto aws = new AWSProvider("aws", "aws", awsTypes);
 
-    auto twilioAuth = twilio->addBasicAuth("comms", "password");
-    system.addProvider(twilio, twilioAuth);
+        auto twilioAuth = twilio->addBasicAuth("comms", "password");
+        system.addProvider(twilio, twilioAuth);
 
-    auto awsAuth = aws->addBasicAuth("aws", "password");
-    system.addProvider(aws, awsAuth);
+        auto awsAuth = aws->addBasicAuth("aws", "password");
+        system.addProvider(aws, awsAuth);
 
-    unordered_map<string, string> payload = {
-        {"from", "abc"},
-        {"to", "def"},
-        {"subject", "hello"},
-        {"message", "msg"}
-    };
+        unordered_map<string, string> payload = {
+            {"from", "abc"},
+            {"to", "def"},
+            {"subject", "hello"},
+            {"message", "msg"}
+        };
 
-    auto request = new CommsRequest(CommsType::EMAIL, CommsPriority::TRANSACTIONAL, payload);
-    system.processRequest(request);
+        auto request = new CommsRequest(CommsType::EMAIL, CommsPriority::TRANSACTIONAL, payload);
+        system.processRequest(request);
     } catch (const exception& e) {
         cout<<"Exception: "<<e.what() <<endl;
     }
